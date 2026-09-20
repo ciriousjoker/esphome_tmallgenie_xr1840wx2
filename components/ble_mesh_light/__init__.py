@@ -3,7 +3,7 @@ import re
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import light as esphome_light
-from esphome.components.esp32 import add_idf_sdkconfig_option
+from esphome.components.esp32 import add_idf_sdkconfig_option, request_bluetooth
 
 CONF_NET_KEY = "net_key"
 CONF_APP_KEY = "app_key"
@@ -50,10 +50,12 @@ def validate_key_index(value):
 
 DEPENDENCIES = ["esp32"]
 MULTI_CONF = False
-CONFIG_SCHEMA = cv.All(cv.Schema({}), cv.only_with_esp_idf)
+CONFIG_SCHEMA = cv.All(cv.Schema({}), cv.only_with_framework("esp-idf"))
 
 
 async def to_code(config):
+    request_bluetooth()
+
     # Keep all ESP-IDF requirements inside the external component so users do
     # not need to copy a fragile sdkconfig_options block into their YAML.
     options = {

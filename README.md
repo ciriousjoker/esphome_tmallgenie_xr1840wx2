@@ -5,7 +5,7 @@ An ESPHome external component for controlling an already-provisioned Alibaba/Tma
 The component talks to the lamp directly over Bluetooth Mesh. It does not emulate the remote's separate radio protocol, require a cloud connection after setup, or install a web dashboard.
 
 > [!NOTE]
-> On/off control and the reported power state are verified on the reference hardware. Brightness, color-temperature, preset, vendor-command, and timer mappings are implemented from the reverse-engineered protocol but have not yet been successfully verified on this lamp. They are therefore commented out in the example configuration.
+> On/off control and the acknowledged power state after ESPHome commands are verified on the reference hardware. The driver does not expose changes made with its separate physical remote. Brightness, color-temperature, preset, vendor-command, and timer mappings are implemented from the reverse-engineered protocol but have not yet been successfully verified on this lamp. They are therefore commented out in the example configuration.
 
 ## Reference hardware
 
@@ -26,14 +26,14 @@ The repository targets the Bluetooth Mesh controller inside this driver rather t
 Verified on the reference hardware:
 
 - Acknowledged on/off commands with queueing and retries
-- Reported power state and periodic state polling
+- Acknowledged power state after commands from ESPHome
+- Persistent last confirmed state across ESP32 restarts
 - Persistent Mesh sequence-number ranges to survive power cycles
 
 Implemented but not yet verified on the reference hardware:
 
 - Absolute brightness from 0–100%
 - Color temperature through the Bluetooth Mesh CTL model
-- Brightness and temperature state polling
 - Day and night presets
 - AliGenie `MainLight` vendor commands
 - Local 60-second off timer
@@ -43,7 +43,7 @@ The optional button mapping models all twelve positions of the physical remote. 
 ## Requirements
 
 - An ESP32 with Bluetooth; tested on a LOLIN D32 Pro (classic ESP32)
-- ESPHome with the `esp-idf` framework; tested with ESPHome 2025.12.3 / ESP-IDF 5.5.1
+- ESPHome with the `esp-idf` framework; tested with ESPHome 2026.9.0 / ESP-IDF 5.5.5
 - A TmallGenie `XR 18-40WX2` driver, or compatible Alibaba/Tmall Genie Bluetooth Mesh hardware
 - The lamp's NetKey, AppKey, key indexes, IV Index, and unicast address
 
@@ -265,7 +265,7 @@ Only one `ble_mesh_light` instance is supported per ESP32.
 - Never run two controllers with the same `controller_address`. Bluetooth Mesh replay protection requires each sender address to be unique.
 - Do not erase the ESP32's NVS and then reuse the same controller address. NVS stores the next sequence-number range; after a full flash erase, select a fresh controller address.
 - The component uses an ESP-IDF-internal network-entry helper because the public provisioner API cannot attach a controller to a Mesh created by another provisioner. This dependency is isolated in `ble_mesh_bridge.c`; pinning a release tag protects normal builds from upstream changes.
-- State is polled every 30 seconds. A physical-remote change can therefore take up to roughly one poll interval to appear in Home Assistant.
+- The tested driver acknowledges Generic OnOff Set but does not answer Generic OnOff, Lightness, CTL, or AliGenie attribute queries. The component persists the last confirmed state across ESP32 restarts, but changes made with the separate physical remote cannot be reflected in Home Assistant.
 - Generic on/off is confirmed on the photographed `XR 18-40WX2`. Brightness, CTL, presets, and `MainLight` remain experimental until independently verified on working hardware.
 
 ## Local development

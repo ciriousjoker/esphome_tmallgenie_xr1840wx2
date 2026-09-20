@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Restore the last confirmed light state after an ESP32 restart instead of reporting the lamp as off.
+- Stop issuing unsupported periodic state queries that only time out on the reference driver.
+- Support the ESPHome 2026.9 framework validation and ESP-IDF component discovery APIs.
+
 ## v0.1.0 — 2026-07-15
 
 - Initial ESPHome external-component release for the TmallGenie `XR 18-40WX2` LED driver.
