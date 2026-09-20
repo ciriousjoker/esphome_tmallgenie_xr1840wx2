@@ -282,6 +282,22 @@ external_components:
 
 Then validate and build with `esphome config your-device.yaml` and `esphome compile your-device.yaml`.
 
+## Releases
+
+Releases are created manually:
+
+1. In `CHANGELOG.md`, rename the current `Unreleased` section to `vX.Y.Z - YYYY-MM-DD` using the release date, then add a new empty `Unreleased` section above it.
+2. Create one dedicated release commit whose message contains the version, for example `Release v0.2.0`.
+3. Tag that exact commit with the same version and push both the commit and the tag:
+
+   ```bash
+   git add CHANGELOG.md
+   git commit -m "Release v0.2.0"
+   git tag v0.2.0
+   git push origin main
+   git push origin v0.2.0
+   ```
+
 ## License
 
 MIT
