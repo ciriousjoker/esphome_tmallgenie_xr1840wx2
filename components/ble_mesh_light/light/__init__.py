@@ -31,11 +31,14 @@ def validate_addresses(config):
     return config
 
 CONFIG_SCHEMA = cv.All(
-    light.LIGHT_SCHEMA.extend(
+    light.light_schema(
+        BleMeshLight,
+        light.LightType.BINARY,
+        default_restore_mode="RESTORE_DEFAULT_OFF",
+    ).extend(
         {
-            cv.GenerateID(CONF_OUTPUT_ID): cv.declare_id(BleMeshLight),
-            cv.Required(CONF_NET_KEY): validate_key,
-            cv.Required(CONF_APP_KEY): validate_key,
+            cv.Required(CONF_NET_KEY): cv.sensitive(validate_key),
+            cv.Required(CONF_APP_KEY): cv.sensitive(validate_key),
             cv.Required(CONF_TARGET_ADDRESS): validate_u16,
             cv.Required(CONF_CONTROLLER_ADDRESS): validate_u16,
             cv.Optional(CONF_IV_INDEX, default="0"): validate_u32,

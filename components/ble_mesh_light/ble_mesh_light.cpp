@@ -199,33 +199,9 @@ void BleMeshLight::mesh_ready_callback_(bool ready, void *context) {
     }
 
     ESP_LOGI(TAG, "Bluetooth Mesh controller is ready");
+    if (self->state_binary_sensor_ != nullptr && self->light_state_ != nullptr)
+      self->state_binary_sensor_->publish_state(self->light_state_->current_values.is_on());
     self->send_pending_state_();
-
-    const auto log_query_error = [](const char *name, int err) {
-      if (err != ESP_OK && err != ESP_ERR_INVALID_STATE)
-        ESP_LOGW(TAG, "%s query failed: %s", name, esp_err_to_name(err));
-    };
-    self->set_timeout("mesh-initial-onoff", 1000, [log_query_error]() {
-      log_query_error("Initial OnOff", ble_mesh_bridge_get_onoff());
-    });
-    self->set_timeout("mesh-initial-lightness", 4000, [log_query_error]() {
-      log_query_error("Initial lightness", ble_mesh_bridge_get_lightness());
-    });
-    self->set_timeout("mesh-initial-ctl", 8000, [log_query_error]() {
-      log_query_error("Initial CTL", ble_mesh_bridge_get_ctl());
-    });
-
-    // Poll all state models, staggered to coexist reliably with Wi-Fi. This
-    // also reflects changes made with the original physical remote in HA.
-    self->set_interval("mesh-state-poll", 30000, [self, log_query_error]() {
-      log_query_error("Periodic OnOff", ble_mesh_bridge_get_onoff());
-      self->set_timeout("mesh-poll-lightness", 3000, [log_query_error]() {
-        log_query_error("Periodic lightness", ble_mesh_bridge_get_lightness());
-      });
-      self->set_timeout("mesh-poll-ctl", 6000, [log_query_error]() {
-        log_query_error("Periodic CTL", ble_mesh_bridge_get_ctl());
-      });
-    });
   });
 }
 
