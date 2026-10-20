@@ -38,7 +38,7 @@ Implemented but not yet verified on the reference hardware:
 - AliGenie `MainLight` vendor commands
 - Local 60-second off timer
 
-The optional button mapping models all twelve positions of the physical remote. Button 5 (`SETUP`) deliberately does nothing: pairing and provisioning are destructive operations and should not be available through an accidental Home Assistant button press.
+The optional button mapping models all twelve positions of the physical remote. The legacy button 5 (`SETUP`) remains disabled. Account-free recovery pairing has a separate, explicitly configured `pair` button.
 
 ## Requirements
 
@@ -48,6 +48,71 @@ The optional button mapping models all twelve positions of the physical remote. 
 - The lamp's NetKey, AppKey, key indexes, IV Index, and unicast address
 
 ESP8266 and ESP32-S2 are not supported because they have no Bluetooth radio. Other Bluetooth-capable ESP32 variants are not yet tested.
+
+## Account-free recovery pairing (current source)
+
+The current source adds opt-in recovery pairing for the manufacturer's fast
+provisioning protocol, without a vendor app, account, cloud request, or phone.
+Use a local component source until this feature is included in a release.
+The controller reuses its configured network keys and lamp address.
+
+Add the lamp's exact Bluetooth MAC and a separate unused provisioner address to
+its existing `light` configuration:
+
+```yaml
+light:
+  - platform: ble_mesh_light
+    # Keep the existing output_id, keys, indexes and addresses here.
+    output_id: mesh_controller
+    pairing_mac: "11:22:33:44:55:66"  # Replace with your lamp's MAC.
+    pairing_controller_address: "0x6FFC"  # Must be unused in your Mesh.
+
+button:
+  - platform: ble_mesh_light
+    ble_mesh_light_id: mesh_controller
+    remote_button: pair
+    name: Pair
+    entity_category: config
+
+text_sensor:
+  - platform: ble_mesh_light
+    ble_mesh_light_id: mesh_controller
+    name: Pairing Status
+    entity_category: diagnostic
+```
+
+Turn the lamp on at its mains switch, then press **Pair** in Home Assistant.
+A 60-second attempt exchanges vendor randoms, restores the configured NetKey
+and address, and installs the configured AppKey. The lamp controls its own
+blink pattern. Status changes from `Waiting for lamp` to `Restoring network`,
+`Installing application key`, and finally `Paired` only after an authenticated
+successful Config AppKey Status, or a fresh authenticated lamp response that
+confirms the existing keys already work. A timeout or rejection reports failure and
+stops transmitting. Repeated button presses do not restart an active attempt.
+Pair first gives an ON command and its retries a 12-second receive window
+without recovery advertisements to check an existing pairing. A fresh
+acknowledgement confirms the existing keys and stops the recovery exchange.
+Pressing Pair can therefore turn the lamp on; this also avoids relying on
+queries that some reference drivers ignore.
+There is no automatic pairing on ESP32 startup or after a control timeout.
+
+`Paired` confirms a successful application-key acknowledgement or an existing
+authenticated pairing. Normal switching and persistence across a lamp mains
+restart are separate end-to-end checks. The
+fast-provisioning format supports NetKey index 0 and IV indexes 0..255. The
+pairing sender has its own persistent sequence-number ranges in ESP32 NVS;
+do not erase NVS and reuse the same sender address.
+
+The receiver also authenticates the lamp's vendor `0E 07` response envelopes,
+including on/off indications to group `0xF000`. This allows real lamp state
+to satisfy a matching pending on/off request instead of reporting a timeout.
+Replayed application responses are suppressed during the current ESP32 run.
+
+This is the vendor's recovery protocol, using equal random halves and the
+lamp's confirmation to derive the session. Its publicly observable exchange
+allows a nearby listener to derive the pairing session and recover network
+keys. Use it only where that Bluetooth exposure is acceptable. Configured
+keys and confirmations are never logged or published in Home Assistant.
 
 ## ESPHome example
 
@@ -71,6 +136,7 @@ esp32:
   board: lolin_d32_pro
   framework:
     type: esp-idf
+    version: 5.5.5
 
 external_components:
   - source: github://ciriousjoker/esphome_tmallgenie_xr1840wx2@v0.1.0
@@ -268,6 +334,11 @@ Only one `ble_mesh_light` instance is supported per ESP32.
 - The tested driver acknowledges Generic OnOff Set but does not answer Generic OnOff, Lightness, CTL, or AliGenie attribute queries. The component persists the last confirmed state across ESP32 restarts, but changes made with the separate physical remote cannot be reflected in Home Assistant.
 - Generic on/off is confirmed on the photographed `XR 18-40WX2`. Brightness, CTL, presets, and `MainLight` remain experimental until independently verified on working hardware.
 
+The current pairing transport applies a build-local workaround for ESP-IDF
+5.5.5's one-shot BLE advertising buffer ownership. The shared SDK cache stays
+unchanged. The source checksum is pinned; a different SDK source fails the
+build with a request to review the workaround instead of silently patching it.
+
 ## Local development
 
 Use a local source while editing:
@@ -281,6 +352,12 @@ external_components:
 ```
 
 Then validate and build with `esphome config your-device.yaml` and `esphome compile your-device.yaml`.
+
+Run `python3 tests/run_tests.py` for the host protocol tests. They require a C
+compiler and OpenSSL headers/libraries, and run with address/undefined-behavior
+sanitizers. The tests use public protocol vectors and simulated radio/NVS
+interfaces, without device credentials. They do not replace the ESP-IDF build
+or physical pairing and switching tests.
 
 ## Releases
 

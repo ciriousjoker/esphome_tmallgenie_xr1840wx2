@@ -2,8 +2,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 
 #include "ble_mesh_bridge.h"
+#include "ble_mesh_pairing.h"
 #include "esphome/core/log.h"
 #include "esp_err.h"
 
@@ -38,6 +40,25 @@ void BleMeshLight::setup() {
     return;
   }
 
+  if (!this->pairing_mac_.empty()) {
+    uint8_t mac[6];
+    unsigned int bytes[6];
+    if (sscanf(this->pairing_mac_.c_str(), "%x:%x:%x:%x:%x:%x", &bytes[0], &bytes[1], &bytes[2],
+               &bytes[3], &bytes[4], &bytes[5]) != 6) {
+      this->mark_failed();
+      return;
+    }
+    for (size_t i = 0; i < 6; i++) mac[i] = bytes[i];
+    int pairing_err = ble_mesh_pairing_configure(mac, this->pairing_address_, this->net_key_.data(),
+        this->app_key_.data(), this->target_address_, this->controller_address_, this->iv_index_,
+        this->net_idx_, this->app_idx_, &BleMeshLight::pairing_status_callback_, this);
+    if (pairing_err != ESP_OK) {
+      ESP_LOGE(TAG, "Pairing initialization failed: %s", esp_err_to_name(pairing_err));
+      this->mark_failed();
+      return;
+    }
+  }
+
   const int err = ble_mesh_bridge_init(this->net_key_.data(), this->app_key_.data(),
                                        this->target_address_, this->controller_address_,
                                        this->iv_index_, this->net_idx_, this->app_idx_,
@@ -49,6 +70,15 @@ void BleMeshLight::setup() {
     ESP_LOGE(TAG, "BLE Mesh initialization failed: %s", esp_err_to_name(err));
     this->mark_failed();
   }
+}
+
+void BleMeshLight::loop() { ble_mesh_pairing_poll(); }
+
+void BleMeshLight::pairing_status_callback_(const char *status, void *context) {
+  auto *self = static_cast<BleMeshLight *>(context);
+  // BLE events are queued and processed on the ESPHome main loop.
+  if (self->pairing_status_sensor_ != nullptr)
+    self->pairing_status_sensor_->publish_state(status);
 }
 
 void BleMeshLight::dump_config() {
@@ -113,6 +143,14 @@ void BleMeshLight::press_remote_button(uint8_t button) {
   };
 
   switch (button) {
+    case 13: {
+      int err = ble_mesh_pairing_start();
+      if (err != ESP_OK)
+        ESP_LOGW(TAG, "Pairing not started: %s", esp_err_to_name(err));
+      else
+        ble_mesh_bridge_send_onoff(true);  // Confirm an existing pairing with the lamp on.
+      break;
+    }
     case 1:
       this->pending_on_ = true;
       ESP_LOGI(TAG, "Remote button 1 (ON): %s",

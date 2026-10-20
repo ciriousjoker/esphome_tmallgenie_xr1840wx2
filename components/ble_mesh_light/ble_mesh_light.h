@@ -7,20 +7,27 @@
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/light/light_output.h"
 #include "esphome/core/component.h"
+#include "esphome/components/text_sensor/text_sensor.h"
 
 namespace esphome::ble_mesh_light {
 
 class BleMeshStateBinarySensor : public binary_sensor::BinarySensor {};
 
+class BleMeshPairingStatusTextSensor : public text_sensor::TextSensor {};
+
 class BleMeshLight : public light::LightOutput, public Component {
  public:
   void setup() override;
+  void loop() override;
   void dump_config() override;
   float get_setup_priority() const override { return setup_priority::HARDWARE; }
   light::LightTraits get_traits() override;
   void setup_state(light::LightState *state) override { this->light_state_ = state; }
   void write_state(light::LightState *state) override;
 
+  void set_pairing_mac(const std::string &value) { this->pairing_mac_ = value; }
+  void set_pairing_controller_address(uint16_t value) { this->pairing_address_ = value; }
+  void set_pairing_status_sensor(BleMeshPairingStatusTextSensor *sensor) { this->pairing_status_sensor_ = sensor; }
   void set_net_key(const std::string &value) { this->net_key_hex_ = value; }
   void set_app_key(const std::string &value) { this->app_key_hex_ = value; }
   void set_target_address(uint16_t value) { this->target_address_ = value; }
@@ -36,11 +43,15 @@ class BleMeshLight : public light::LightOutput, public Component {
  protected:
   bool decode_key_(const std::string &hex, std::array<uint8_t, 16> &key);
   void send_pending_state_();
+  static void pairing_status_callback_(const char *status, void *context);
   static void mesh_ready_callback_(bool ready, void *context);
   static void onoff_state_callback_(bool on, void *context);
   static void lightness_state_callback_(uint16_t lightness, void *context);
   static void temperature_state_callback_(uint16_t temperature, void *context);
 
+  std::string pairing_mac_;
+  uint16_t pairing_address_{0};
+  BleMeshPairingStatusTextSensor *pairing_status_sensor_{nullptr};
   std::string net_key_hex_;
   std::string app_key_hex_;
   std::array<uint8_t, 16> net_key_{};

@@ -9,6 +9,7 @@ CONF_REMOTE_BUTTON = "remote_button"
 
 REMOTE_BUTTONS = {
     "on": 1,
+    "pair": 13,
     "off": 2,
     "brightness_up": 3,
     "temperature_down": 4,

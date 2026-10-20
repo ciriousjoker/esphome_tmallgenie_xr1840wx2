@@ -27,6 +27,9 @@ int ble_mesh_bridge_get_lightness(void);
 int ble_mesh_bridge_send_vendor_main_light(bool enabled);
 int ble_mesh_bridge_send_ctl(uint16_t lightness, uint16_t temperature);
 int ble_mesh_bridge_get_ctl(void);
+// Called only after the manufacturer transport authenticates both Mesh layers.
+void ble_mesh_bridge_receive_authenticated_onoff(bool on);
+void ble_mesh_bridge_receive_authenticated_vendor(const uint8_t *data, uint16_t length);
 
 #ifdef __cplusplus
 }

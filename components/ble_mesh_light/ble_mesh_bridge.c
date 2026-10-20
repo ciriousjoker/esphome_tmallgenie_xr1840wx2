@@ -1,4 +1,5 @@
 #include "ble_mesh_bridge.h"
+#include "ble_mesh_pairing.h"
 
 #include <inttypes.h>
 #include <string.h>
@@ -458,8 +459,10 @@ static void generic_client_callback(esp_ble_mesh_generic_client_cb_event_t event
         ESP_LOGD(TAG, "Status from 0x%04X: Generic OnOff is %s%s", address,
                  present_onoff ? "ON" : "OFF",
                  param->status_cb.onoff_status.op_en ? " (transition active)" : "");
-        if (address == target_address)
+        if (address == target_address) {
           report_onoff(present_onoff);
+          ble_mesh_pairing_confirm_existing();
+        }
         if (opcode == ESP_BLE_MESH_MODEL_OP_GEN_ONOFF_SET)
           finish_onoff_request(true, present_onoff);
         else {
@@ -476,8 +479,10 @@ static void generic_client_callback(esp_ble_mesh_generic_client_cb_event_t event
         const bool present_onoff = param->status_cb.onoff_status.present_onoff;
         ESP_LOGD(TAG, "OnOff publication from 0x%04X: %s", address,
                  present_onoff ? "ON" : "OFF");
-        if (address == target_address)
+        if (address == target_address) {
           report_onoff(present_onoff);
+          ble_mesh_pairing_confirm_existing();
+        }
       } else {
         ESP_LOGD(TAG, "Mesh publish from 0x%04X for opcode=0x%04" PRIX32,
                  address, opcode);
@@ -600,6 +605,14 @@ static void light_client_callback(esp_ble_mesh_light_client_cb_event_t event,
   }
 }
 
+void ble_mesh_bridge_receive_authenticated_onoff(bool on) {
+  ESP_LOGI(TAG, "Authenticated lamp state from 0x%04X: %s", target_address, on ? "ON" : "OFF");
+  report_onoff(on);
+  ble_mesh_pairing_confirm_existing();
+  if (onoff_request_in_flight && active_onoff == on)
+    finish_onoff_request(true, on);
+}
+
 static void parse_aligenie_vendor_status(uint16_t source, const uint8_t *data, uint16_t length) {
   if (source != target_address || data == NULL || length < 1)
     return;
@@ -613,7 +626,7 @@ static void parse_aligenie_vendor_status(uint16_t source, const uint8_t *data, u
       const bool on = data[offset++] != 0;
       ESP_LOGD(TAG, "AliGenie status from 0x%04X tid=%u: OnOff=%s",
                source, tid, on ? "ON" : "OFF");
-      report_onoff(on);
+      ble_mesh_bridge_receive_authenticated_onoff(on);
     } else if (attribute == ALIGENIE_ATTR_LIGHTNESS && offset + 2 <= length) {
       const uint16_t lightness = data[offset] | ((uint16_t) data[offset + 1] << 8);
       offset += 2;
@@ -636,6 +649,10 @@ static void parse_aligenie_vendor_status(uint16_t source, const uint8_t *data, u
       break;
     }
   }
+}
+
+void ble_mesh_bridge_receive_authenticated_vendor(const uint8_t *data, uint16_t length) {
+  parse_aligenie_vendor_status(target_address, data, length);
 }
 
 static void custom_model_callback(esp_ble_mesh_model_cb_event_t event,
@@ -712,6 +729,12 @@ static void provisioning_callback(esp_ble_mesh_prov_cb_event_t event,
     return;
   }
 
+  err = ble_mesh_pairing_radio_start();
+  if (err != ESP_OK) {
+    ESP_LOGE(TAG, "Unable to initialize pairing transport: %s", esp_err_to_name(err));
+    report_ready(false);
+    return;
+  }
   ESP_LOGI(TAG, "Joined captured Mesh network as 0x%04X", controller_address);
   report_ready(true);
 }

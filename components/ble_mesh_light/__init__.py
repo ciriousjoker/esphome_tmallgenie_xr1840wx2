@@ -1,9 +1,13 @@
 import re
+from pathlib import Path
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import light as esphome_light
-from esphome.components.esp32 import add_idf_sdkconfig_option, request_bluetooth
+from esphome.components.esp32 import (
+    add_extra_build_file, add_idf_sdkconfig_option, request_bluetooth,
+)
+from esphome.core import CORE
 
 CONF_NET_KEY = "net_key"
 CONF_APP_KEY = "app_key"
@@ -48,6 +52,7 @@ def validate_key_index(value):
     return number
 
 
+AUTO_LOAD = ["text_sensor"]
 DEPENDENCIES = ["esp32"]
 MULTI_CONF = False
 CONFIG_SCHEMA = cv.All(cv.Schema({}), cv.only_with_framework("esp-idf"))
@@ -55,6 +60,13 @@ CONFIG_SCHEMA = cv.All(cv.Schema({}), cv.only_with_framework("esp-idf"))
 
 async def to_code(config):
     request_bluetooth()
+    hook = "mesh_pairing_idf_fix.cmake"
+    hook_path = str(CORE.relative_build_path(hook))
+    existing_hook = CORE.cmake_args.get("CMAKE_PROJECT_INCLUDE")
+    if existing_hook is not None and existing_hook != hook_path:
+        raise cv.Invalid("ble_mesh_light cannot replace an existing CMAKE_PROJECT_INCLUDE hook")
+    add_extra_build_file(hook, Path(__file__).with_name(hook))
+    cg.add_cmake_arg("CMAKE_PROJECT_INCLUDE", hook_path)
 
     # Keep all ESP-IDF requirements inside the external component so users do
     # not need to copy a fragile sdkconfig_options block into their YAML.
@@ -68,6 +80,9 @@ async def to_code(config):
         "CONFIG_BLE_MESH_PROVISIONER": False,
         "CONFIG_BLE_MESH_CFG_CLI": False,
         "CONFIG_BLE_MESH_SETTINGS": False,
+        "CONFIG_BLE_MESH_SUPPORT_BLE_ADV": True,
+        "CONFIG_BLE_MESH_SUPPORT_BLE_SCAN": True,
+        "CONFIG_MBEDTLS_CCM_C": True,
         "CONFIG_BLE_MESH_SELF_TEST": True,
         "CONFIG_BLE_MESH_TEST_AUTO_ENTER_NETWORK": True,
         "CONFIG_BLE_MESH_GENERIC_ONOFF_CLI": True,
