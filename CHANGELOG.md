@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.3.0 - 2026-10-20
+
 - Add an opt-in, account-free recovery pairing button for a configured lamp MAC, with a 60-second limit and authenticated application-key confirmation.
 - Expose pairing progress and failures through an optional text sensor.
 - Decode authenticated vendor advertising responses and use matching lamp on/off indications to complete pending commands.

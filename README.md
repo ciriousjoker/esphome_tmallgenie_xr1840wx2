@@ -49,11 +49,11 @@ The optional button mapping models all twelve positions of the physical remote. 
 
 ESP8266 and ESP32-S2 are not supported because they have no Bluetooth radio. Other Bluetooth-capable ESP32 variants are not yet tested.
 
-## Account-free recovery pairing (current source)
+## Account-free recovery pairing (v0.3.0)
 
-The current source adds opt-in recovery pairing for the manufacturer's fast
+Version v0.3.0 adds opt-in recovery pairing for the manufacturer's fast
 provisioning protocol, without a vendor app, account, cloud request, or phone.
-Use a local component source until this feature is included in a release.
+Use the pinned `github://ciriousjoker/esphome_tmallgenie_xr1840wx2@v0.3.0` source.
 The controller reuses its configured network keys and lamp address.
 
 Add the lamp's exact Bluetooth MAC and a separate unused provisioner address to
@@ -139,7 +139,7 @@ esp32:
     version: 5.5.5
 
 external_components:
-  - source: github://ciriousjoker/esphome_tmallgenie_xr1840wx2@v0.1.0
+  - source: github://ciriousjoker/esphome_tmallgenie_xr1840wx2@v0.3.0
     components: [ble_mesh_light]
     refresh: 1d
 
